@@ -42,8 +42,8 @@ fn main() -> eframe::Result {
             .with_inner_size([1200.0, 600.0])
             .with_title("Zen Editor")
             .with_decorations(false)
-            .with_icon(Arc::new(load_icon()))
             .with_transparent(true)
+            .with_icon(Arc::new(load_icon()))
             .with_min_inner_size([800.0, 400.0]),
         ..Default::default()
     };

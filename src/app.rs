@@ -31,9 +31,9 @@ impl Default for ZenEditor {
 
 impl ZenEditor {
     fn custom_window_frame(
+        &mut self,
         ctx: &egui::Context,
-        frame: &mut eframe::Frame,
-        add_contents: impl FnOnce(&mut egui::Ui)
+        add_contents: impl FnOnce(&mut ZenEditor, &mut egui::Ui),
     ) {
         let panel_frame = egui::Frame {
             fill: ctx.style().visuals.window_fill,
@@ -44,7 +44,7 @@ impl ZenEditor {
                 blur: 16,
                 spread: 0,
             },
-            outer_margin: egui::Margin::same(8),
+            outer_margin: egui::Margin::same(0),
             ..Default::default()
         };
 
@@ -54,48 +54,26 @@ impl ZenEditor {
                 let app_rect = ui.max_rect();
 
                 let title_bar_height = 40.0;
-                let menu_bar_height = 35.0;
 
                 let title_bar_rect = egui::Rect::from_min_size(
                     app_rect.min,
                     egui::vec2(app_rect.width(), title_bar_height),
                 );
 
-                let menu_bar_rect = egui::Rect::from_min_size(
-                    egui::pos2(app_rect.min.x, app_rect.min.y + title_bar_height),
-                    egui::vec2(app_rect.width(), menu_bar_height),
-                );
 
                 let content_rect = egui::Rect::from_min_size(
-                    egui::pos2(app_rect.min.x, app_rect.min.y + title_bar_height + menu_bar_height),
-                    egui::vec2(app_rect.width(), app_rect.height() - title_bar_height - menu_bar_height),
+                    egui::pos2(app_rect.min.x, app_rect.min.y + title_bar_height),
+                    egui::vec2(app_rect.width(), app_rect.height() - title_bar_height),
                 );
 
-                Self::show_title_bar(ui, title_bar_rect, frame);
-
-                #[allow(deprecated)]
-                ui.allocate_ui_at_rect(menu_bar_rect, |ui| {
-                    ui.painter().rect_filled(
-                        menu_bar_rect,
-                        egui::CornerRadius::ZERO,
-                        ui.style().visuals.faint_bg_color,
-                    );
-
-                    ui.painter().line_segment(
-                        [
-                            egui::pos2(menu_bar_rect.min.x, menu_bar_rect.max.y),
-                            egui::pos2(menu_bar_rect.max.x, menu_bar_rect.max.y),
-                        ],
-                        egui::Stroke::new(1.0, ui.style().visuals.widgets.noninteractive.bg_stroke.color),
-                    );
-                });
+                self.show_title_bar(ui, title_bar_rect);
 
                 let mut content_ui = ui.new_child(egui::UiBuilder::new().max_rect(content_rect).layout(egui::Layout::top_down(egui::Align::LEFT)));
-                add_contents(&mut content_ui);
+                add_contents(self, &mut content_ui);
             });
     }
 
-    fn show_title_bar(ui: &mut egui::Ui, rect: egui::Rect, _frame: &mut eframe::Frame) {
+    fn show_title_bar(&mut self, ui: &mut egui::Ui, rect: egui::Rect) {
         let interact = ui.interact(rect, egui::Id::new("title_bar"), egui::Sense::click_and_drag());
 
         if interact.dragged() {
@@ -103,7 +81,9 @@ impl ZenEditor {
         }
 
         if interact.double_clicked() {
-            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false))));
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(
+                !ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false)),
+            ));
         }
 
         ui.painter().rect_filled(
@@ -112,123 +92,118 @@ impl ZenEditor {
             ui.style().visuals.panel_fill,
         );
 
-        let mut title_ui = ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::left_to_right(egui::Align::Center)));
+        let mut title_ui = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(rect)
+                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        );
         title_ui.spacing_mut().item_spacing.x = 8.0;
-        title_ui.add_space(12.0);
+        title_ui.add_space(4.0);
 
         title_ui.colored_label(
             title_ui.style().visuals.text_color(),
-            "⚡ Zen Editor"
+            "⚡ Zen"
         );
+
+        title_ui.style_mut().visuals.widgets.inactive.bg_fill = egui::Color32::TRANSPARENT;
+        title_ui.style_mut().visuals.widgets.inactive.weak_bg_fill = egui::Color32::TRANSPARENT;
+        title_ui.style_mut().visuals.widgets.active.weak_bg_fill = egui::Color32::TRANSPARENT;
+        title_ui.style_mut().visuals.widgets.hovered.weak_bg_fill = egui::Color32::TRANSPARENT;
+
+        title_ui.menu_button(egui::RichText::new("≡").monospace().size(14.0), |ui| {
+            ui.menu_button("File", |ui| {
+                if ui.button("New File").clicked() {
+                    self.code_editor.code.clear();
+                    self.code_editor.selected_file = None;
+                    ui.close();
+                }
+                if ui.button("Open File...").clicked() {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Text files", &["txt"])
+                        .add_filter("Rust files", &["rs"])
+                        .add_filter("All files", &["*"])
+                        .pick_file()
+                    {
+                        self.code_editor.load_file(&path);
+                    }
+                    ui.close();
+                }
+                if ui.button("Open Project...").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                        self.code_editor.open_project(path);
+                    }
+                    ui.close();
+                }
+                ui.separator();
+                if ui.button("Save").clicked() {
+                    self.save_current_file();
+                    ui.close();
+                }
+                if ui.button("Save As...").clicked() {
+                    self.save_file_as();
+                    ui.close();
+                }
+                ui.separator();
+                if ui.button("Exit").clicked() {
+                    std::process::exit(0);
+                }
+            });
+
+            ui.menu_button("Edit", |ui| {
+                ui.add_enabled_ui(false, |ui| {
+                    let _ = ui.button("Undo");
+                });
+                ui.add_enabled_ui(false, |ui| {
+                    let _ = ui.button("Redo");
+                });
+                ui.separator();
+                ui.add_enabled_ui(false, |ui| {
+                    let _ = ui.button("Cut");
+                });
+                ui.add_enabled_ui(false, |ui| {
+                    let _ = ui.button("Copy");
+                });
+                ui.add_enabled_ui(false, |ui| {
+                    let _ = ui.button("Paste");
+                });
+            });
+
+            ui.menu_button("Settings", |ui| {
+                if ui.button("Preferences...").clicked() {
+                    self.show_settings = true;
+                    ui.close();
+                }
+            });
+        });
 
         title_ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_space(8.0);
+            let button_size = egui::vec2(22.0, 22.0);
 
-            let button_size = egui::vec2(28.0, 20.0);
-
-            if ui.add_sized(button_size, egui::Button::new("X"))
-                .on_hover_text("Close")
-                .clicked() {
+            let close_response = ui.add_sized(
+                button_size,
+                egui::Button::new(egui::RichText::new("🗙").size(10.0)).frame(false),
+            );
+            if close_response.clicked() {
                 ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
             }
 
-            if ui.add_sized(button_size, egui::Button::new("[]"))
-                .on_hover_text("Maximize/Restore")
-                .clicked() {
-                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false))));
+            let max_response = ui.add_sized(
+                button_size,
+                egui::Button::new(egui::RichText::new("🗖").size(10.0)).frame(false),
+            );
+            if max_response.clicked() {
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(
+                    !ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false)),
+                ));
             }
 
-            if ui.add_sized(button_size, egui::Button::new("−"))
-                .on_hover_text("Minimize")
-                .clicked() {
+            let min_response = ui.add_sized(
+                button_size,
+                egui::Button::new(egui::RichText::new("🗕").size(10.0)).frame(false),
+            );
+            if min_response.clicked() {
                 ui.ctx().send_viewport_cmd(egui::ViewportCommand::Minimized(true));
-            }
-        });
-
-        ui.painter().line_segment(
-            [
-                egui::pos2(rect.min.x, rect.max.y),
-                egui::pos2(rect.max.x, rect.max.y),
-            ],
-            egui::Stroke::new(1.0, ui.style().visuals.widgets.noninteractive.bg_stroke.color),
-        );
-    }
-
-    fn show_menu_bar(&mut self, ui: &mut egui::Ui, rect: egui::Rect) {
-        let mut menu_ui = ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::left_to_right(egui::Align::Center)));
-        menu_ui.spacing_mut().item_spacing.x = 4.0;
-        menu_ui.add_space(8.0);
-
-        let style = menu_ui.style_mut();
-        style.visuals.widgets.inactive.weak_bg_fill = egui::Color32::TRANSPARENT;
-        style.visuals.widgets.inactive.bg_fill = egui::Color32::TRANSPARENT;
-
-        menu_ui.menu_button("File", |ui| {
-            if ui.button("New File").clicked() {
-                self.code_editor.code.clear();
-                self.code_editor.selected_file = None;
-                ui.close();
-            }
-            if ui.button("Open File...").clicked() {
-                if let Some(path) = rfd::FileDialog::new()
-                    .add_filter("Text files", &["txt"])
-                    .add_filter("Rust files", &["rs"])
-                    .add_filter("All files", &["*"])
-                    .pick_file() {
-                    self.code_editor.load_file(&path);
-                }
-                ui.close();
-            }
-            if ui.button("Open Project...").clicked() {
-                if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                    self.code_editor.open_project(path);
-                }
-                ui.close();
-            }
-            ui.separator();
-            if ui.button("Save").clicked() {
-                self.save_current_file();
-                ui.close();
-            }
-            if ui.button("Save As...").clicked() {
-                self.save_file_as();
-                ui.close();
-            }
-            ui.separator();
-            if ui.button("Exit").clicked() {
-                std::process::exit(0);
-            }
-        });
-
-        menu_ui.menu_button("Edit", |ui| {
-            ui.add_enabled_ui(false, |ui| {
-                let _ = ui.button("Undo");
-            });
-            ui.add_enabled_ui(false, |ui| {
-                let _ = ui.button("Redo");
-            });
-            ui.separator();
-            ui.add_enabled_ui(false, |ui| {
-                let _ = ui.button("Cut");
-            });
-            ui.add_enabled_ui(false, |ui| {
-                let _ = ui.button("Copy");
-            });
-            ui.add_enabled_ui(false, |ui| {
-                let _ = ui.button("Paste");
-            });
-        });
-
-        menu_ui.menu_button("View", |ui| {
-            if ui.button("Toggle File Explorer").clicked() {
-                ui.close();
-            }
-        });
-
-        menu_ui.menu_button("Settings", |ui| {
-            if ui.button("Preferences...").clicked() {
-                self.show_settings = true;
-                ui.close();
             }
         });
     }
@@ -332,28 +307,12 @@ impl ZenEditor {
 }
 
 impl eframe::App for ZenEditor {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.handle_keyboard_shortcuts(ctx);
         self.show_settings_window(ctx);
 
-        let menu_bar_rect = {
-            let app_rect = ctx.available_rect();
-            let title_bar_height = 40.0;
-            let menu_bar_height = 35.0;
-            egui::Rect::from_min_size(
-                egui::pos2(app_rect.min.x + 8.0, app_rect.min.y + title_bar_height + 8.0),
-                egui::vec2(app_rect.width() - 16.0, menu_bar_height),
-            )
-        };
-
-        egui::Area::new(egui::Id::new("menu_area"))
-            .fixed_pos(menu_bar_rect.min)
-            .show(ctx, |ui| {
-                self.show_menu_bar(ui, menu_bar_rect);
-            });
-
-        Self::custom_window_frame(ctx, frame, |ui| {
-            self.code_editor.ui(ui);
+        self.custom_window_frame(ctx, |app, ui| {
+            app.code_editor.ui(ui);
         });
     }
 }

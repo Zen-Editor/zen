@@ -73,19 +73,6 @@ impl ZenView for CodeEditor {
     fn ui(&mut self, ui: &mut egui::Ui) {
         self.theme.apply_to_context(ui.ctx());
 
-        ui.horizontal(|ui| {
-            ui.colored_label(
-                self.theme.text_color(),
-                format!("Lines: {}", self.code.lines().count())
-            );
-            ui.colored_label(
-                self.theme.text_color(),
-                format!("Characters: {}", self.code.len())
-            );
-        });
-
-        ui.separator();
-
         egui::SidePanel::left("file_tree")
             .resizable(true)
             .default_width(200.0)

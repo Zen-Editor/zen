@@ -8,8 +8,8 @@
     "text_primary": [200, 200, 230],
     "text_secondary": [170, 170, 200],
     "text_disabled": [100, 100, 120],
-    "button_bg": [50, 30, 60],
-    "button_hover": [70, 50, 90],
+    "button_bg": [52, 35, 94],
+    "button_hover": [73, 49, 133],
     "button_active": [90, 70, 130],
     "selection": [138, 43, 226],
     "separator": [50, 30, 60]
