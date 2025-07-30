@@ -1,0 +1,27 @@
+{
+  "name": "Cosmic Purple",
+  "colors": {
+    "window_bg": [10, 10, 20],
+    "panel_bg": [15, 12, 30],
+    "editor_bg": [20, 15, 40],
+    "faint_bg": [25, 20, 50],
+    "text_primary": [200, 200, 230],
+    "text_secondary": [170, 170, 200],
+    "text_disabled": [100, 100, 120],
+    "button_bg": [50, 30, 60],
+    "button_hover": [70, 50, 90],
+    "button_active": [90, 70, 130],
+    "selection": [138, 43, 226],
+    "separator": [50, 30, 60]
+  },
+  "spacing": {
+    "item_spacing": [8.0, 6.0],
+    "button_padding": [12.0, 6.0],
+    "window_margin": 8.0,
+    "panel_margin": 6
+  },
+  "typography": {
+    "font_size": 14.0,
+    "code_font_size": 13.0
+  }
+}
