@@ -40,20 +40,6 @@ impl CodeEditor {
         }
     }
 
-    pub fn switch_to_light_theme(&mut self) {
-        self.theme = ZenTheme::light_theme();
-        if let Some(index) = self.available_themes.iter().position(|t| t.name == "Light") {
-            self.selected_theme_index = index;
-        }
-    }
-
-    pub fn switch_to_dark_theme(&mut self) {
-        self.theme = ZenTheme::dark_theme();
-        if let Some(index) = self.available_themes.iter().position(|t| t.name == "Dark") {
-            self.selected_theme_index = index;
-        }
-    }
-
     pub(crate) fn load_file(&mut self, path: &PathBuf) {
         if let Ok(content) = std::fs::read_to_string(path) {
             self.code = content;

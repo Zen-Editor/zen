@@ -8,12 +8,15 @@ mod ui;
 fn main() -> eframe::Result {
     env_logger::init();
 
+    let icon_data = load_icon();
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1200.0, 800.0])
+            .with_inner_size([1200.0, 700.0])
             .with_min_inner_size([800.0, 600.0])
             .with_decorations(false)
-            .with_transparent(true),
+            .with_transparent(true)
+            .with_icon(icon_data),
         ..Default::default()
     };
 
@@ -22,6 +25,33 @@ fn main() -> eframe::Result {
         options,
         Box::new(|_cc| Ok(Box::new(app::ZenEditor::default()))),
     )
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn load_icon() -> egui::IconData {
+    let icon_bytes = include_bytes!("../assets/zen_logo.png");
+
+    match image::load_from_memory(icon_bytes) {
+        Ok(image) => {
+            let image = image.to_rgba8();
+            let (width, height) = image.dimensions();
+            let rgba = image.into_raw();
+
+            egui::IconData {
+                rgba,
+                width,
+                height,
+            }
+        }
+        Err(e) => {
+            log::warn!("Failed to load embedded icon: {}", e);
+            egui::IconData {
+                rgba: vec![255; 32 * 32 * 4],
+                width: 32,
+                height: 32,
+            }
+        }
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
