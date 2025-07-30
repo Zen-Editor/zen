@@ -1,5 +1,9 @@
 use eframe::egui;
 use crate::config::EditorConfig;
+#[cfg(target_arch = "wasm32")]
+use std::sync::Arc;
+#[cfg(target_arch = "wasm32")]
+use std::sync::Mutex;
 
 pub trait ZenView {
     fn ui(&mut self, ui: &mut egui::Ui);
@@ -186,6 +190,8 @@ impl ZenEditor {
                 }
             });
         });
+
+        egui::warn_if_debug_build(&mut title_ui);
 
         title_ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_space(8.0);

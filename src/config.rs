@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditorConfig {
@@ -16,20 +15,29 @@ impl Default for EditorConfig {
 
 impl EditorConfig {
     pub fn load() -> Self {
-        let config_path = "config.json";
-        if Path::new(config_path).exists() {
-            if let Ok(json) = std::fs::read_to_string(config_path) {
-                if let Ok(config) = serde_json::from_str(&json) {
-                    return config;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if let Ok(current_dir) = std::env::current_dir() {
+                let config_path = current_dir.join("config.json");
+                if config_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(config_path) {
+                        if let Ok(config) = serde_json::from_str(&content) {
+                            return config;
+                        }
+                    }
                 }
             }
         }
+
         Self::default()
     }
 
     pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let json = serde_json::to_string_pretty(self)?;
-        std::fs::write("config.json", json)?;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let json = serde_json::to_string_pretty(self)?;
+            std::fs::write("config.json", json)?;
+        }
         Ok(())
     }
 }

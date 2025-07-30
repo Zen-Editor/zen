@@ -77,9 +77,6 @@ impl FileExplorer {
     }
 
     pub fn render(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Explorer");
-        ui.separator();
-
         egui::ScrollArea::both()
             .auto_shrink([false; 2])
             .show(ui, |ui| {

@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use egui::Color32;
-use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZenTheme {
@@ -110,22 +109,36 @@ impl ZenTheme {
     }
 
     pub fn load_available_themes() -> Vec<ZenTheme> {
+        let current_dir = std::env::current_dir().unwrap();
+        let themes_dir = current_dir.join("themes");
+
         let mut themes = vec![
             Self::dark_theme(),
             Self::light_theme(),
         ];
 
-        if Path::new("themes").exists() {
-            if let Ok(entries) = std::fs::read_dir("themes") {
-                for entry in entries.flatten() {
-                    if let Some(ext) = entry.path().extension() {
-                        if ext == "json" {
-                            if let Ok(theme) = Self::load_from_file(&entry.path().to_string_lossy()) {
-                                themes.push(theme);
-                            }
-                        }
-                    }
-                }
+        if !themes_dir.exists() {
+            return themes;
+        }
+
+        let entries = match std::fs::read_dir(themes_dir) {
+            Ok(e) => e,
+            Err(_) => return themes
+        };
+
+        for entry in entries.flatten() {
+            let binding = entry.path();
+            let ext = match binding.extension() {
+                Some(e) => e,
+                None => continue
+            };
+
+            if ext != "json" {
+                continue;
+            }
+
+            if let Ok(theme) = Self::load_from_file(&entry.path().to_string_lossy()) {
+                themes.push(theme);
             }
         }
 

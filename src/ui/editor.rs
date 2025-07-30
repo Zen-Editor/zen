@@ -40,7 +40,7 @@ impl CodeEditor {
         }
     }
 
-    pub(crate) fn load_file(&mut self, path: &PathBuf) {
+    pub fn load_file(&mut self, path: &PathBuf) {
         if let Ok(content) = std::fs::read_to_string(path) {
             self.code = content;
             self.selected_file = Some(path.clone());
@@ -127,7 +127,7 @@ impl ZenView for CodeEditor {
                                 .layouter(&mut layouter),
                         );
 
-                        if !response.has_focus() {
+                        if !response.has_focus() && response.hovered() {
                             response.request_focus();
                         }
                     });
