@@ -1,0 +1,12 @@
+msrv = "1.70.0"
+single-char-binding-names-threshold = 5
+type-complexity-threshold = 250
+too-many-arguments-threshold = 8
+too-many-lines-threshold = 150
+cognitive-complexity-threshold = 35
+large-enum-variant-threshold = 500
+missing-docs-in-crate-items = false
+avoid-breaking-exported-api = false
+manual-slice-size-calculation = false
+match-wild-err-arm = false
+single-match-else = false

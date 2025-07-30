@@ -1,6 +1,5 @@
 use eframe::egui;
 use crate::config::EditorConfig;
-use std::sync::{Arc, Mutex};
 
 pub trait ZenView {
     fn ui(&mut self, ui: &mut egui::Ui);
@@ -39,8 +38,7 @@ impl ZenEditor {
         #[cfg(target_arch = "wasm32")]
         return false;
 
-        #[cfg(not(target_arch = "wasm32"))]
-        return true;
+        true
     }
 
     #[cfg(target_arch = "wasm32")]
