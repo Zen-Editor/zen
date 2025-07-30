@@ -1,5 +1,6 @@
 use eframe::egui;
 use crate::config::EditorConfig;
+use std::sync::{Arc, Mutex};
 
 pub trait ZenView {
     fn ui(&mut self, ui: &mut egui::Ui);
@@ -9,6 +10,8 @@ pub struct ZenEditor {
     pub(crate) code_editor: crate::ui::editor::CodeEditor,
     config: EditorConfig,
     show_settings: bool,
+    #[cfg(target_arch = "wasm32")]
+    pending_file_content: Arc<Mutex<Option<(String, String)>>>,
 }
 
 impl Default for ZenEditor {
@@ -18,6 +21,8 @@ impl Default for ZenEditor {
             code_editor: crate::ui::editor::CodeEditor::default(),
             config,
             show_settings: false,
+            #[cfg(target_arch = "wasm32")]
+            pending_file_content: Arc::new(Mutex::new(None)),
         };
 
         if let Some(theme) = editor.code_editor.available_themes.iter()
@@ -30,6 +35,24 @@ impl Default for ZenEditor {
 }
 
 impl ZenEditor {
+    fn should_use_custom_frame(&self) -> bool {
+        #[cfg(target_arch = "wasm32")]
+        return false;
+
+        #[cfg(not(target_arch = "wasm32"))]
+        return true;
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn handle_pending_file_operations(&mut self) {
+        if let Ok(mut pending) = self.pending_file_content.try_lock() {
+            if let Some((filename, content)) = pending.take() {
+                self.code_editor.code = content;
+                self.code_editor.selected_file = Some(std::path::PathBuf::from(filename));
+            }
+        }
+    }
+
     fn custom_window_frame(
         &mut self,
         ctx: &egui::Context,
@@ -52,14 +75,12 @@ impl ZenEditor {
             .frame(panel_frame)
             .show(ctx, |ui| {
                 let app_rect = ui.max_rect();
-
                 let title_bar_height = 40.0;
 
                 let title_bar_rect = egui::Rect::from_min_size(
                     app_rect.min,
                     egui::vec2(app_rect.width(), title_bar_height),
                 );
-
 
                 let content_rect = egui::Rect::from_min_size(
                     egui::pos2(app_rect.min.x, app_rect.min.y + title_bar_height),
@@ -118,20 +139,11 @@ impl ZenEditor {
                     ui.close();
                 }
                 if ui.button("Open File...").clicked() {
-                    if let Some(path) = rfd::FileDialog::new()
-                        .add_filter("Text files", &["txt"])
-                        .add_filter("Rust files", &["rs"])
-                        .add_filter("All files", &["*"])
-                        .pick_file()
-                    {
-                        self.code_editor.load_file(&path);
-                    }
+                    self.open_file_dialog();
                     ui.close();
                 }
                 if ui.button("Open Project...").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                        self.code_editor.open_project(path);
-                    }
+                    self.open_project_dialog();
                     ui.close();
                 }
                 ui.separator();
@@ -144,6 +156,7 @@ impl ZenEditor {
                     ui.close();
                 }
                 ui.separator();
+                #[cfg(not(target_arch = "wasm32"))]
                 if ui.button("Exit").clicked() {
                     std::process::exit(0);
                 }
@@ -217,6 +230,7 @@ impl ZenEditor {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn save_current_file(&mut self) {
         if let Some(path) = &self.code_editor.selected_file {
             if let Err(e) = std::fs::write(path, &self.code_editor.code) {
@@ -227,6 +241,12 @@ impl ZenEditor {
         }
     }
 
+    #[cfg(target_arch = "wasm32")]
+    fn save_current_file(&mut self) {
+        self.save_file_as();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn save_file_as(&mut self) {
         if let Some(path) = rfd::FileDialog::new()
             .add_filter("Text files", &["txt"])
@@ -239,6 +259,70 @@ impl ZenEditor {
                 self.code_editor.selected_file = Some(path);
             }
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn save_file_as(&mut self) {
+        let code = self.code_editor.code.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            if let Some(handle) = rfd::AsyncFileDialog::new()
+                .add_filter("Text files", &["txt"])
+                .add_filter("Rust files", &["rs"])
+                .add_filter("All files", &["*"])
+                .save_file()
+                .await
+            {
+                if let Err(e) = handle.write(code.as_bytes()).await {
+                    eprintln!("Failed to save file: {}", e);
+                }
+            }
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn open_file_dialog(&mut self) {
+        if let Some(path) = rfd::FileDialog::new()
+            .add_filter("Text files", &["txt"])
+            .add_filter("Rust files", &["rs"])
+            .add_filter("All files", &["*"])
+            .pick_file()
+        {
+            self.code_editor.load_file(&path);
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn open_file_dialog(&mut self) {
+        let pending = self.pending_file_content.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            if let Some(handle) = rfd::AsyncFileDialog::new()
+                .add_filter("Text files", &["txt"])
+                .add_filter("Rust files", &["rs"])
+                .add_filter("All files", &["*"])
+                .pick_file()
+                .await
+            {
+                let data = handle.read().await;
+                let content = String::from_utf8_lossy(&data).to_string();
+                let filename = handle.file_name();
+
+                if let Ok(mut pending_lock) = pending.lock() {
+                    *pending_lock = Some((filename, content));
+                }
+            }
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn open_project_dialog(&mut self) {
+        if let Some(path) = rfd::FileDialog::new().pick_folder() {
+            self.code_editor.open_project(path);
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn open_project_dialog(&mut self) {
+        eprintln!("Project opening not supported in web version");
     }
 
     fn show_settings_window(&mut self, ctx: &egui::Context) {
@@ -308,11 +392,20 @@ impl ZenEditor {
 
 impl eframe::App for ZenEditor {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        #[cfg(target_arch = "wasm32")]
+        self.handle_pending_file_operations();
+
         self.handle_keyboard_shortcuts(ctx);
         self.show_settings_window(ctx);
 
-        self.custom_window_frame(ctx, |app, ui| {
-            app.code_editor.ui(ui);
-        });
+        if self.should_use_custom_frame() {
+            self.custom_window_frame(ctx, |app, ui| {
+                app.code_editor.ui(ui);
+            });
+        } else {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                self.code_editor.ui(ui);
+            });
+        }
     }
 }
