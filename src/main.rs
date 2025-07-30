@@ -69,7 +69,7 @@ fn main() {
                     .unwrap()
                     .document()
                     .unwrap()
-                    .get_element_by_id("the_canvas_id")
+                    .get_element_by_id("zenvas")
                     .unwrap()
                     .dyn_into::<web_sys::HtmlCanvasElement>()
                     .unwrap(),
