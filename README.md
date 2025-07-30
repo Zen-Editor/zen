@@ -2,6 +2,9 @@
 
 A superfast code editor with no bloat, no fuss.
 
+## WASM
+[Building for wasm](docs/WASM.MD)
+
 # License
 
 > © Zen Industries 2025
