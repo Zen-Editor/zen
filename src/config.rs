@@ -17,18 +17,23 @@ impl EditorConfig {
     pub fn load() -> Self {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            if let Ok(current_dir) = std::env::current_dir() {
-                let config_path = current_dir.join("config.json");
-                if config_path.exists() {
-                    if let Ok(content) = std::fs::read_to_string(config_path) {
-                        if let Ok(config) = serde_json::from_str(&content) {
-                            return config;
-                        }
-                    }
-                }
-            }
-        }
+            let current_dir = match std::env::current_dir() {
+                Ok(dir) => dir,
+                Err(_) => return Self::default(),
+            };
 
+            let config_path = current_dir.join("config.json");
+            if !config_path.exists() {
+                return Self::default();
+            }
+
+            let content = match std::fs::read_to_string(config_path) {
+                Ok(content) => content,
+                Err(_) => return Self::default(),
+            };
+
+            serde_json::from_str(&content).unwrap_or_else(|_| Self::default());
+        }
         Self::default()
     }
 

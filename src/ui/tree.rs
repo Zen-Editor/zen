@@ -80,14 +80,19 @@ impl FileExplorer {
         egui::ScrollArea::both()
             .auto_shrink([false; 2])
             .show(ui, |ui| {
-                if let Some(ref mut tree) = self.root.clone() {
-                    self.render_node(ui, tree, 0);
-                    self.root = Some(tree.clone());
+                if let Some(tree) = &mut self.root {
+                    Self::render_node_static(tree, ui, 0, &mut self.selected_file, &mut self.pending_file_load);
                 }
             });
     }
 
-    fn render_node(&mut self, ui: &mut egui::Ui, node: &mut FileTreeNode, depth: usize) {
+    fn render_node_static(
+        node: &mut FileTreeNode,
+        ui: &mut egui::Ui,
+        depth: usize,
+        selected_file: &mut Option<PathBuf>,
+        pending_file_load: &mut Option<PathBuf>
+    ) {
         let indent = depth as f32 * 15.0;
 
         ui.horizontal(|ui| {
@@ -103,18 +108,18 @@ impl FileExplorer {
                 let icon = "📄";
                 let name = node.path.file_name().unwrap().to_string_lossy();
                 if ui.selectable_label(
-                    self.selected_file.as_ref() == Some(&node.path),
+                    selected_file.as_ref() == Some(&node.path),
                     format!("{} {}", icon, name)
                 ).clicked() {
-                    self.pending_file_load = Some(node.path.clone());
-                    self.selected_file = Some(node.path.clone());
+                    *pending_file_load = Some(node.path.clone());
+                    *selected_file = Some(node.path.clone());
                 }
             }
         });
 
         if node.is_directory && node.expanded {
             for child in &mut node.children {
-                self.render_node(ui, child, depth + 1);
+                Self::render_node_static(child, ui, depth + 1, selected_file, pending_file_load);
             }
         }
     }
